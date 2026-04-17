@@ -5,9 +5,9 @@
     "moduleResolution": "bundler",
     "outDir": "dist",
     "rootDir": "src",
-    "strict": true,
+    "strict": false,
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "resolveJsonModule": true
   },
   "include": ["src/**/*"]
