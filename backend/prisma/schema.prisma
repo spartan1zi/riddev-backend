@@ -1,0 +1,459 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  WORKER
+  ADMIN
+}
+
+enum JobCategory {
+  // Legacy (kept for existing rows)
+  CARPENTER
+  AC_REPAIR
+  MECHANIC
+  PLUMBER
+  ELECTRICIAN
+  OTHER
+  // Home & repairs
+  CLEANING
+  LAUNDRY
+  FUMIGATION
+  PAINTING
+  TILING
+  ROOFING
+  MASONRY
+  WELDING
+  GLASS_ALUMINIUM
+  INTERIOR_DESIGN
+  CCTV
+  // Appliance & tech
+  FRIDGE
+  WASHING_MACHINE
+  GENERATOR
+  ELECTRONICS
+  PHONE_LAPTOP
+  SOLAR
+  // Vehicle
+  AUTO_ELECTRICIAN
+  CAR_AC
+  TYRE
+  CAR_WASH
+  TOWING
+  DRIVING_LESSONS
+  // Beauty & wellness
+  HAIRDRESSING
+  BARBERING
+  MAKEUP
+  NAILS
+  MASSAGE
+  FITNESS
+  TATTOO
+  // Events
+  CATERING
+  DJ
+  MC
+  PHOTOGRAPHY
+  VIDEOGRAPHY
+  DECORATION
+  SOUND
+  TENT_CHAIR
+  BAND
+  // Education
+  TUTORING
+  LANGUAGES
+  MUSIC_LESSONS
+  CHILDMINDING
+  SPECIAL_NEEDS
+  // Business & digital
+  GRAPHIC_DESIGN
+  WEB_DEV
+  SOCIAL_MEDIA
+  VIDEO_EDITING
+  PRINTING
+  ACCOUNTING
+  LEGAL
+  TRANSLATION
+  // Logistics
+  MOVING
+  DELIVERY
+  TRUCK_HIRE
+}
+
+enum JobStatus {
+  OPEN
+  QUOTED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  DISPUTED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  COUNTERED
+}
+
+enum TransactionStatus {
+  PENDING
+  HELD
+  RELEASED
+  REFUNDED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+}
+
+/// Who can see a dispute thread message (admin picks channel when messaging).
+enum DisputeMessageChannel {
+  /// Customer, worker (if any), and admins
+  ALL
+  /// Only admin and the job customer (worker does not see)
+  ADMIN_CUSTOMER
+  /// Only admin and the assigned worker (customer does not see)
+  ADMIN_WORKER
+}
+
+enum BackgroundCheckStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WorkerTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum MomoProvider {
+  MTN
+  TELECEL
+  AIRTELTIGO
+  OTHER
+}
+
+enum WalletLedgerType {
+  TOPUP
+  ESCROW_HOLD
+  ESCROW_RELEASE
+  JOB_PAYMENT
+  WITHDRAWAL
+  ADMIN_CREDIT
+  ADMIN_DEBIT
+  REFUND
+  TIP
+}
+
+enum WalletLedgerDirection {
+  CREDIT
+  DEBIT
+}
+
+enum WalletLedgerStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  phone         String   @unique
+  passwordHash  String
+  role          UserRole
+  profilePhoto  String?
+  locationLat   Float?
+  locationLng   Float?
+  isVerified    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  isSuspended   Boolean  @default(false)
+  /// FCM device token for system push when app is backgrounded (nullable until registered).
+  fcmToken      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workerProfile WorkerProfile?
+  customerJobs  Job[]           @relation("CustomerJobs")
+  workerJobs    Job[]           @relation("WorkerJobs")
+  quotes        Quote[]
+  chatMessages  ChatMessage[]
+  reviewsGiven  Review[]        @relation("Reviewer")
+  reviewsRecv   Review[]        @relation("Reviewee")
+  notifications Notification[]
+  disputesRaised   Dispute[]         @relation("DisputeRaisedBy")
+  disputeMessages  DisputeMessage[]
+  transactionsCustomer Transaction[] @relation("TxnCustomer")
+  transactionsWorker   Transaction[] @relation("TxnWorker")
+  refreshTokens RefreshToken[]
+  favouriteWorkers FavouriteWorker[] @relation("CustomerFavourites")
+  favouritedBy     FavouriteWorker[] @relation("WorkerFavourited")
+  wallet           Wallet?
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model WorkerProfile {
+  id                    String                 @id @default(uuid())
+  userId                String                 @unique
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio                   String?
+  serviceCategories     String[]
+  baseLocationLat       Float?
+  baseLocationLng       Float?
+  serviceRadiusKm       Float                  @default(20)
+  idDocumentUrl         String?
+  backgroundCheckStatus BackgroundCheckStatus  @default(PENDING)
+  rating                Float                  @default(0)
+  totalJobsCompleted    Int                    @default(0)
+  tier                  WorkerTier             @default(BRONZE)
+  commissionRateBps     Int                    @default(1500)
+  bankAccountNumber     String?
+  momoNumber            String?
+  momoProvider          MomoProvider?
+  isOnline              Boolean                @default(false)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+}
+
+model Job {
+  id                   String       @id @default(uuid())
+  customerId           String
+  customer             User         @relation("CustomerJobs", fields: [customerId], references: [id])
+  workerId             String?
+  worker               User?        @relation("WorkerJobs", fields: [workerId], references: [id])
+  category             JobCategory
+  title                String
+  description          String
+  photos               String[]
+  status               JobStatus    @default(OPEN)
+  locationLat          Float
+  locationLng         Float
+  address              String
+  agreedPricePesewas   Int?
+  platformFeePesewas   Int?
+  workerPayoutPesewas  Int?
+  trustFeePesewas      Int?
+  firestoreThreadId    String?
+  createdAt            DateTime     @default(now())
+  scheduledAt          DateTime?
+  completedAt          DateTime?
+  quoteAcceptedAt      DateTime?
+  paymentInitiatedAt   DateTime?
+  /// Set when the worker taps “work done” — customer must confirm via payment release.
+  workerRequestedCompletionAt DateTime?
+
+  quotes        Quote[]
+  chatMessages  ChatMessage[]
+  transactions  Transaction[]
+  reviews       Review[]
+  disputes      Dispute[]
+  walletLedgerEntries WalletLedgerEntry[]
+}
+
+model Wallet {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balancePesewas Int      @default(0)
+  isLocked       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  ledgerEntries WalletLedgerEntry[]
+}
+
+model WalletLedgerEntry {
+  id             String               @id @default(uuid())
+  walletId       String
+  wallet         Wallet               @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  type           WalletLedgerType
+  direction      WalletLedgerDirection
+  amountPesewas  Int
+  balanceBefore  Int
+  balanceAfter   Int
+  description    String?
+  reference      String?
+  jobId          String?
+  job            Job?                 @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  status         WalletLedgerStatus   @default(COMPLETED)
+  createdAt      DateTime             @default(now())
+
+  @@index([walletId])
+  @@index([jobId])
+}
+
+model Quote {
+  id                  String      @id @default(uuid())
+  jobId               String
+  job                 Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  workerId            String
+  worker              User        @relation(fields: [workerId], references: [id])
+  amountPesewas       Int
+  breakdown           Json?
+  message             String?
+  status              QuoteStatus @default(PENDING)
+  counterAmountPesewas Int?
+  expiresAt           DateTime
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([jobId])
+  @@index([workerId, jobId])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  content   String
+  isBlocked Boolean  @default(false)
+  timestamp DateTime @default(now())
+
+  @@index([jobId])
+}
+
+model Transaction {
+  id               String            @id @default(uuid())
+  jobId            String
+  job              Job               @relation(fields: [jobId], references: [id])
+  customerId     String
+  customer         User              @relation("TxnCustomer", fields: [customerId], references: [id])
+  workerId         String
+  worker           User              @relation("TxnWorker", fields: [workerId], references: [id])
+  paystackReference String?          @unique
+  amountPesewas    Int
+  platformFeePesewas Int
+  workerAmountPesewas Int
+  status           TransactionStatus @default(PENDING)
+  momoProvider     MomoProvider?
+  momoNumber       String?
+  createdAt        DateTime          @default(now())
+  releasedAt       DateTime?
+
+  @@index([jobId])
+}
+
+model Review {
+  id          String   @id @default(uuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id])
+  reviewerId  String
+  reviewer    User     @relation("Reviewer", fields: [reviewerId], references: [id])
+  revieweeId  String
+  reviewee    User     @relation("Reviewee", fields: [revieweeId], references: [id])
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  @@unique([jobId, reviewerId])
+}
+
+model Dispute {
+  id             String            @id @default(uuid())
+  jobId          String
+  job            Job               @relation(fields: [jobId], references: [id])
+  raisedById     String
+  raisedBy       User              @relation("DisputeRaisedBy", fields: [raisedById], references: [id])
+  reason         String
+  evidencePhotos String[]
+  status         DisputeStatus     @default(OPEN)
+  resolution     String?
+  adminNotes     String?
+  /// When false, only admins may post to the ALL (Everyone) channel; customer/worker use private admin threads only.
+  everyoneChannelEnabled Boolean   @default(false)
+  /// When true, only admins may post any message; customer/worker can still read history.
+  disputeChatLocked        Boolean   @default(false)
+  createdAt      DateTime          @default(now())
+  resolvedAt     DateTime?
+
+  messages       DisputeMessage[]
+}
+
+/// Dispute chat: optional per-party channels (see [DisputeMessageChannel]).
+model DisputeMessage {
+  id         String                 @id @default(uuid())
+  disputeId  String
+  dispute    Dispute                @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User                   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  channel    DisputeMessageChannel  @default(ALL)
+  body       String                 @db.Text
+  imageUrls  String[]               @default([])
+  createdAt  DateTime               @default(now())
+
+  @@index([disputeId])
+  @@index([disputeId, channel])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  type      String
+  data      Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model FavouriteWorker {
+  id        String   @id @default(uuid())
+  customerId String
+  customer  User     @relation("CustomerFavourites", fields: [customerId], references: [id], onDelete: Cascade)
+  workerId  String
+  worker    User     @relation("WorkerFavourited", fields: [workerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([customerId, workerId])
+}
+
+model OffPlatformReport {
+  id          String   @id @default(uuid())
+  reporterId  String
+  reportedId  String
+  jobId       String?
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model AppSettings {
+  id                   String @id @default("default")
+  defaultCommissionBps Int    @default(1500)
+  updatedAt            DateTime @updatedAt
+}

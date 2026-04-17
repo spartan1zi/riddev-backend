@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #f59e0b;
+  --background: #f9fafb;
+  --foreground: #111827;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply antialiased text-gray-900;
+}
+
+/* Page entrance — EOD `animate-page-in` (motion only, no opacity hide) */
+@keyframes fade-in-up {
+  from {
+    transform: translateY(0.35rem);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-page-in {
+  animation: fade-in-up 0.4s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-in {
+    animation: none;
+  }
+}
+
+/* Scrollbars — EOD-style */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+  .admin-table-shell {
+    @apply overflow-x-auto rounded-xl border border-gray-200/80 bg-white/60 shadow-[0_8px_24px_rgba(0,0,0,0.05)] backdrop-blur-sm;
+  }
+  .admin-input {
+    @apply w-full rounded-xl border border-gray-200/90 bg-white/90 px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/25;
+  }
+  .admin-btn-primary {
+    @apply rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(245,158,11,0.35)] transition hover:from-amber-600 hover:to-amber-700 disabled:opacity-50;
+  }
+  .admin-btn-secondary {
+    @apply rounded-xl border border-gray-200/90 bg-white/80 px-3 py-2 text-sm font-medium text-gray-800 shadow-sm backdrop-blur-sm transition hover:border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-900;
+  }
+  .admin-link {
+    @apply font-medium text-amber-700 underline-offset-2 hover:text-amber-800 hover:underline;
+  }
+}
