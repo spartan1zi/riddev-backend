@@ -19,14 +19,14 @@ const io = new Server(httpServer, {
 
 setRealtimeServer(io);
 
+// auth middleware
 io.use((socket, next) => {
   const token =
     socket.handshake.auth?.token ??
     (socket.handshake.headers.authorization as string)?.replace("Bearer ", "");
-  if (!token) {
-    next(new Error("Unauthorized"));
-    return;
-  }
+
+  if (!token) return next(new Error("Unauthorized"));
+
   try {
     const payload = verifyAccess(token);
     socket.data.userId = payload.sub;
@@ -38,43 +38,24 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-  const userId = socket.data.userId as string;
-  const role = socket.data.role as string;
-  void socket.join(`user:${userId}`);
-  if (role === "WORKER") {
-    void socket.join("workers:feed");
-  }
-  if (role === "ADMIN") {
-    void socket.join("admins:all");
-  }
+  const userId = socket.data.userId;
+  const role = socket.data.role;
 
-  socket.on("join:dispute", (disputeId: string) => {
-    if (typeof disputeId === "string" && disputeId.length > 0) {
-      void socket.join(`dispute:${disputeId}`);
-    }
-  });
-  socket.on("leave:dispute", (disputeId: string) => {
-    if (typeof disputeId === "string" && disputeId.length > 0) {
-      void socket.leave(`dispute:${disputeId}`);
-    }
-  });
+  socket.join(`user:${userId}`);
 
-  socket.on("join:job", (jobId: string) => {
-    if (typeof jobId === "string" && jobId.length > 0) {
-      void socket.join(`job:${jobId}`);
-    }
-  });
-  socket.on("leave:job", (jobId: string) => {
-    if (typeof jobId === "string" && jobId.length > 0) {
-      void socket.leave(`job:${jobId}`);
-    }
-  });
-  socket.on("worker:location", (payload: { jobId: string; lat: number; lng: number }) => {
+  if (role === "WORKER") socket.join("workers:feed");
+  if (role === "ADMIN") socket.join("admins:all");
+
+  socket.on("join:job", (jobId) => socket.join(`job:${jobId}`));
+  socket.on("leave:job", (jobId) => socket.leave(`job:${jobId}`));
+
+  socket.on("worker:location", (payload) => {
     socket.to(`job:${payload.jobId}`).emit("worker:location", payload);
   });
 });
 
 const port = Number(process.env.PORT) || 4000;
-httpServer.listen(port, () => {
+
+httpServer.listen(port, "0.0.0.0", () => {
   console.log(`RidDev API listening on :${port}`);
 });
