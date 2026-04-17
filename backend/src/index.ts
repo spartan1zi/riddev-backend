@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { createApp } from "./app.js";
+import { createApp } from "./app.ts";
 import { startCronJobs } from "./cron";
 import { initFirebase } from "./lib/firebase";
 import { setRealtimeServer } from "./lib/realtime";
